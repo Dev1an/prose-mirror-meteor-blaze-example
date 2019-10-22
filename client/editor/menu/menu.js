@@ -1,9 +1,9 @@
 import {wrapItem, blockTypeItem, Dropdown, DropdownSubmenu, joinUpItem, liftItem,
        selectParentNodeItem, undoItem, redoItem, icons, MenuItem} from "prosemirror-menu"
-import {NodeSelection} from "prosemirror-state"
 import {toggleMark} from "prosemirror-commands"
 import {wrapInList} from "prosemirror-schema-list"
 import {TextField, openPrompt} from "./prompt"
+import {Transaction, TextSelection} from "prosemirror-state"
 
 // Helpers to create specific types of items
 
@@ -34,6 +34,17 @@ function markActive(state, type) {
   else return state.doc.rangeHasMark(from, to, type)
 }
 
+function getMark(state, type) {
+  const {from, to} = state.selection
+  let firstMark = false
+  if (to > from) state.doc.nodesBetween(from, to, node => {
+    for (const mark of node.marks) {
+      if (mark.type == type) firstMark = mark
+    }
+  })
+  return firstMark
+}
+
 function markItem(markType, options) {
   let passedOptions = {
     active(state) { return markActive(state, markType) },
@@ -43,17 +54,69 @@ function markItem(markType, options) {
   return cmdItem(toggleMark(markType), passedOptions)
 }
 
+function markExtend ($start, mark) {
+  let startIndex = $start.index(),
+      endIndex = $start.indexAfter();
+
+  while (startIndex > 0 && mark.isInSet($start.parent.child(startIndex - 1).marks)) startIndex--;
+  while (
+    endIndex < $start.parent.childCount &&
+    mark.isInSet($start.parent.child(endIndex).marks)
+  ) { endIndex++ }
+  let startPos = $start.start(),
+      endPos = startPos;
+
+  for (let i = 0; i < endIndex; i++) {
+    let size = $start.parent.child(i).nodeSize;
+    if (i < startIndex) startPos += size;
+    endPos += size;
+  }
+  return { from: startPos, to: endPos, mark: mark.isInSet($start.parent.child(startIndex).marks) };
+}
+
 function linkItem(markType) {
   return new MenuItem({
     title: "Add or remove link",
     icon: icons.link,
     active(state) { return markActive(state, markType) },
-    enable(state) { return !state.selection.empty },
+    enable(state) {
+      const active = markActive(state, markType)
+      return (state.selection.empty && active) || (!state.selection.empty && !active)
+    },
     run(state, dispatch, view) {
       if (markActive(state, markType)) {
-        toggleMark(markType)(state, dispatch)
+        const {from, to, mark} = markExtend(state.selection.$from, markType)
+        openPrompt({
+          title: "Edit link",
+          fields: {
+            href: new TextField({
+              label: "Link target",
+              required: true,
+              value: mark.attrs.href
+            }),
+            title: new TextField({
+              label: "Title",
+              value: mark.attrs.title
+            })
+          },
+          callback(attrs) {
+            const updateMark = view.state.tr
+              .removeMark(from, to, mark.type)
+              .addMark(from, to, mark.type.create(attrs))
+            console.log(updateMark.steps)
+            view.dispatch(updateMark)
+            view.focus()
+            view.dispatch(view.state.tr.setSelection(new TextSelection(view.state.doc.resolve(from), view.state.doc.resolve(to))))
+      },
+          remove() {
+            view.dispatch(view.state.tr.removeMark(from, to, mark.type))
+            view.focus()
+            view.dispatch(view.state.tr.setSelection(new TextSelection(view.state.doc.resolve(from), view.state.doc.resolve(to))))
+          }
+        })
         return true
       }
+      console.log("doorgaan")
       openPrompt({
         title: "Create a link",
         fields: {

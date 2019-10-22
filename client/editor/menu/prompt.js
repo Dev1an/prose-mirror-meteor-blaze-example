@@ -31,9 +31,18 @@ export function openPrompt(options) {
   })
   let buttons = form.appendChild(document.createElement("div"))
   buttons.className = prefix + "-buttons"
-  buttons.appendChild(submitButton)
-  buttons.appendChild(document.createTextNode(" "))
+  if (options.remove) {
+    const removeButton = document.createElement("button")
+    removeButton.className = prefix + "-remove"
+    removeButton.textContent = "Remove"
+    removeButton.addEventListener('click', event => {
+      close()
+      options.remove()
+    })
+    buttons.appendChild(removeButton)
+  }
   buttons.appendChild(cancelButton)
+  buttons.appendChild(submitButton)
 
   let box = wrapper.getBoundingClientRect()
   wrapper.style.top = ((window.innerHeight - box.height) / 2) + "px"
