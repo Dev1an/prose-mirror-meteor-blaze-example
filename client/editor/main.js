@@ -19,6 +19,8 @@ Template.ProseMirror.onRendered(function() {
         console.log(Template.currentData())
     }
 
+    let lastUpdate = {}
+
     const properties = {
         state: EditorState.create({
 			doc: schema.nodeFromJSON(emptyDoc),
@@ -29,9 +31,10 @@ Template.ProseMirror.onRendered(function() {
 
             const options = Blaze.getData(template.view).options
             if (options.collection && options.field) {
-                const update = {$set: {[options.field]: newState.doc.toJSON()}}
+                const stamp = (new Date()).getTime + Math.random()
+                const update = {$set: {[options.field]: newState.doc.toJSON(), stamp}}
+                lastUpdate = {newState, stamp}
                 options.collection.update(options.query, update)
-                editor.updateState(newState)
             }
         }
     }
@@ -48,7 +51,9 @@ Template.ProseMirror.onRendered(function() {
                     doc: node,
                     plugins
                 })
-                if (!editor.hasFocus())
+                if (record.stamp && lastUpdate.stamp && record.stamp == lastUpdate.stamp)
+                    editor.updateState(lastUpdate.newState)
+                else
                     editor.updateState(newState)
             }
         }
