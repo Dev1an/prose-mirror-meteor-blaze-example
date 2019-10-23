@@ -1,5 +1,9 @@
 import { Meteor } from 'meteor/meteor';
+import {Pages, emptyDoc} from '../collections/Pages'
+
 
 Meteor.startup(() => {
-  // code to run on server at startup
+  if (Pages.find().count() == 0) {
+    Pages.insert({doc: emptyDoc})
+  }
 });
