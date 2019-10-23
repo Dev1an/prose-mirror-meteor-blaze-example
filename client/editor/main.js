@@ -32,7 +32,7 @@ Template.ProseMirror.onRendered(function() {
             const options = Blaze.getData(template.view).options
             if (options.collection && options.field) {
                 const stamp = (new Date()).getTime + Math.random()
-                const update = {$set: {[options.field]: newState.doc.toJSON(), stamp}}
+                const update = {$set: {[options.field]: {data: newState.doc.toJSON(), stamp}}}
                 lastUpdate = {newState, stamp}
                 options.collection.update(options.query, update)
             }
@@ -45,13 +45,14 @@ Template.ProseMirror.onRendered(function() {
         if (data.options && data.options.collection && data.options.query && data.options.field) {
             const record = data.options.collection.findOne(data.options.query)
             if (record) {
-                const node = schema.nodeFromJSON(record[data.options.field])
+                const info = record[data.options.field]
+                const node = schema.nodeFromJSON(info.data)
                 const newState = EditorState.create({
                     schema,
                     doc: node,
                     plugins
                 })
-                if (record.stamp && lastUpdate.stamp && record.stamp == lastUpdate.stamp)
+                if (info.stamp && lastUpdate.stamp && info.stamp == lastUpdate.stamp)
                     editor.updateState(lastUpdate.newState)
                 else
                     editor.updateState(newState)
